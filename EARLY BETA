@@ -1,0 +1,858 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local TweenService = game:GetService("TweenService")
+local CoreGui = game:GetService("CoreGui")
+local LocalPlayer = Players.LocalPlayer
+
+local targetParent = (gethui and gethui()) or (pcall(function() return CoreGui.Name end) and CoreGui) or LocalPlayer:WaitForChild("PlayerGui")
+
+local VehicleSettings = {
+    -- Page 1: Thrust Engine Settings
+    ThrustEnabled = false,
+    AntiFlip = true,
+    ThrustMaxSpeed = 450,
+    Acceleration = 1.8,
+    CurrentAccelName = "Medium",
+    
+    -- Page 2: Vanilla Mods Settings
+    VanillaUncapEnabled = false,
+    VanillaMaxSpeed = 800,
+    BrakeEnabled = false,
+    BrakePower = 100,
+    BrakeKey = Enum.KeyCode.Space,
+
+    -- Page 3: Troll Mods Settings
+    SpiderCarEnabled = false,
+    GhostModeEnabled = false,
+    
+    -- GUI Settings
+    GuiKeybind = Enum.KeyCode.RightShift
+}
+
+local AccelModes = {
+    ["Very Slow"] = 0.5,
+    ["Slow"] = 1.0,
+    ["Medium"] = 1.8,
+    ["Fast"] = 3.2
+}
+
+-- [[ SOUND EFFECTS ]] --
+local SoundFolder = Instance.new("Folder")
+SoundFolder.Name = "WeloxSounds"
+SoundFolder.Parent = targetParent
+
+local HoverSound = Instance.new("Sound")
+HoverSound.SoundId = "rbxassetid://6895056282"
+HoverSound.Volume = 0.5
+HoverSound.Parent = SoundFolder
+
+local ClickSound = Instance.new("Sound")
+ClickSound.SoundId = "rbxassetid://6895079853"
+ClickSound.Volume = 0.6
+ClickSound.Parent = SoundFolder
+
+local function playSound(soundInfo)
+    local s = soundInfo:Clone()
+    s.Parent = SoundFolder
+    s:Play()
+    game:GetService("Debris"):AddItem(s, 2)
+end
+
+-- [[ TWEEN HELPERS ]] --
+local function addHoverAnimation(btn, normalColor, hoverColor)
+    btn.MouseEnter:Connect(function()
+        playSound(HoverSound)
+        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {BackgroundColor3 = hoverColor}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.2, Enum.EasingStyle.Sine), {BackgroundColor3 = normalColor}):Play()
+    end)
+    btn.MouseButton1Down:Connect(function()
+        playSound(ClickSound)
+        TweenService:Create(btn, TweenInfo.new(0.1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(btn.Size.X.Scale, btn.Size.X.Offset - 4, btn.Size.Y.Scale, btn.Size.Y.Offset - 4)}):Play()
+    end)
+    btn.MouseButton1Up:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out), {Size = UDim2.new(btn.Size.X.Scale, btn.Size.X.Offset + 4, btn.Size.Y.Scale, btn.Size.Y.Offset + 4)}):Play()
+    end)
+end
+
+-- [[ MAIN GUI ]] --
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "WeloxWork_MultiPage_GUI"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = targetParent
+
+-- OVERLAY
+local Overlay = Instance.new("Frame")
+Overlay.Size = UDim2.new(1, 0, 1, 0)
+Overlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+Overlay.BackgroundTransparency = 0.4
+Overlay.BorderSizePixel = 0
+Overlay.Parent = ScreenGui
+
+-- WARNING (BETA) SCREEN
+local WarningGroup = Instance.new("CanvasGroup")
+WarningGroup.Size = UDim2.new(0, 400, 0, 200)
+WarningGroup.Position = UDim2.new(0.5, -200, 0.5, -100)
+WarningGroup.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+WarningGroup.BorderSizePixel = 0
+WarningGroup.Parent = ScreenGui
+
+local WarningCorner = Instance.new("UICorner")
+WarningCorner.CornerRadius = UDim.new(0, 10)
+WarningCorner.Parent = WarningGroup
+
+local WarningTitle = Instance.new("TextLabel")
+WarningTitle.Size = UDim2.new(1, 0, 0, 40)
+WarningTitle.Position = UDim2.new(0, 0, 0, 20)
+WarningTitle.BackgroundTransparency = 1
+WarningTitle.Text = "⚠️ SYSTEM NOTICE"
+WarningTitle.TextColor3 = Color3.fromRGB(255, 85, 85)
+WarningTitle.Font = Enum.Font.GothamBold
+WarningTitle.TextSize = 20
+WarningTitle.Parent = WarningGroup
+
+local WarningText = Instance.new("TextLabel")
+WarningText.Size = UDim2.new(1, -40, 0, 60)
+WarningText.Position = UDim2.new(0, 20, 0, 60)
+WarningText.BackgroundTransparency = 1
+WarningText.Text = "This program is only in beta; we accept no responsibility if you get banned."
+WarningText.TextColor3 = Color3.fromRGB(200, 200, 200)
+WarningText.Font = Enum.Font.GothamMedium
+WarningText.TextSize = 14
+WarningText.TextWrapped = true
+WarningText.Parent = WarningGroup
+
+local AgreeBtn = Instance.new("TextButton")
+AgreeBtn.Size = UDim2.new(0, 200, 0, 40)
+AgreeBtn.Position = UDim2.new(0.5, 0, 1, -30)
+AgreeBtn.AnchorPoint = Vector2.new(0.5, 1)
+AgreeBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+AgreeBtn.Text = "I have read and agree."
+AgreeBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+AgreeBtn.Font = Enum.Font.GothamMedium
+AgreeBtn.TextSize = 13
+AgreeBtn.Parent = WarningGroup
+Instance.new("UICorner", AgreeBtn).CornerRadius = UDim.new(0, 6)
+addHoverAnimation(AgreeBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+
+-- MAIN MENU
+local MainGroup = Instance.new("CanvasGroup")
+MainGroup.Size = UDim2.new(0, 460, 0, 620)
+MainGroup.Position = UDim2.new(0.5, -230, 0.55, -310) 
+MainGroup.BackgroundColor3 = Color3.fromRGB(28, 28, 28)
+MainGroup.BorderSizePixel = 0
+MainGroup.GroupTransparency = 1 
+MainGroup.Visible = false
+MainGroup.Parent = ScreenGui
+
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 10)
+MainCorner.Parent = MainGroup
+
+local Padding = Instance.new("UIPadding")
+Padding.PaddingTop = UDim.new(0, 25)
+Padding.PaddingBottom = UDim.new(0, 25)
+Padding.PaddingLeft = UDim.new(0, 25)
+Padding.PaddingRight = UDim.new(0, 25)
+Padding.Parent = MainGroup
+
+-- CLOSE BUTTON (X)
+local CloseBtn = Instance.new("TextButton")
+CloseBtn.Size = UDim2.new(0, 30, 0, 30)
+CloseBtn.Position = UDim2.new(1, 0, 0, 0)
+CloseBtn.AnchorPoint = Vector2.new(1, 0)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(200, 60, 60)
+CloseBtn.Text = "X"
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.Font = Enum.Font.GothamBold
+CloseBtn.TextSize = 14
+CloseBtn.BorderSizePixel = 0
+CloseBtn.ZIndex = 10
+CloseBtn.Parent = MainGroup
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 6)
+addHoverAnimation(CloseBtn, Color3.fromRGB(200, 60, 60), Color3.fromRGB(230, 80, 80))
+
+CloseBtn.MouseButton1Click:Connect(function()
+    playSound(ClickSound)
+    TweenService:Create(MainGroup, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {GroupTransparency = 1}):Play()
+    task.wait(0.3)
+    MainGroup.Visible = false
+end)
+
+-- TOGGLE KEYBIND (Right Shift)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if input.KeyCode == VehicleSettings.GuiKeybind and WarningGroup.Visible == false then
+        if MainGroup.Visible then
+            TweenService:Create(MainGroup, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {GroupTransparency = 1}):Play()
+            task.wait(0.3)
+            MainGroup.Visible = false
+        else
+            MainGroup.Visible = true
+            TweenService:Create(MainGroup, TweenInfo.new(0.3, Enum.EasingStyle.Sine), {GroupTransparency = 0}):Play()
+        end
+    end
+end)
+
+-- DRAGGING
+local dragging, dragInput, dragStart, startPos
+local DragHitbox = Instance.new("TextButton")
+DragHitbox.Size = UDim2.new(1, -40, 0, 60)
+DragHitbox.BackgroundTransparency = 1
+DragHitbox.Text = ""
+DragHitbox.Parent = MainGroup
+
+DragHitbox.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+        dragStart = input.Position
+        startPos = MainGroup.Position
+    end
+end)
+DragHitbox.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+UserInputService.InputChanged:Connect(function(input)
+    if input == dragInput and dragging then
+        local delta = input.Position - dragStart
+        MainGroup.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+DragHitbox.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
+        dragInput = input
+    end
+end)
+
+local HeaderTitle = Instance.new("TextLabel")
+HeaderTitle.Size = UDim2.new(1, -30, 0, 30)
+HeaderTitle.BackgroundTransparency = 1
+HeaderTitle.Text = "Settings"
+HeaderTitle.TextColor3 = Color3.fromRGB(245, 245, 245)
+HeaderTitle.Font = Enum.Font.GothamMedium
+HeaderTitle.TextSize = 22
+HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
+HeaderTitle.Parent = MainGroup
+
+local SubTitle = Instance.new("TextLabel")
+SubTitle.Size = UDim2.new(1, 0, 0, 20)
+SubTitle.Position = UDim2.new(0, 0, 0, 35)
+SubTitle.BackgroundTransparency = 1
+SubTitle.Text = "Press [Right Shift] to Show/Hide GUI"
+SubTitle.TextColor3 = Color3.fromRGB(150, 200, 255)
+SubTitle.Font = Enum.Font.Gotham
+SubTitle.TextSize = 12
+SubTitle.TextXAlignment = Enum.TextXAlignment.Left
+SubTitle.Parent = MainGroup
+
+-- [[ TAB SYSTEM ]] --
+local TabBar = Instance.new("Frame")
+TabBar.Size = UDim2.new(1, 0, 0, 35)
+TabBar.Position = UDim2.new(0, 0, 0, 65)
+TabBar.BackgroundTransparency = 1
+TabBar.Parent = MainGroup
+
+local function createTabBtn(text, xPos, isActive)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0.32, 0, 1, 0)
+    Btn.Position = UDim2.new(xPos, 0, 0, 0)
+    Btn.BackgroundColor3 = isActive and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(35, 35, 35)
+    Btn.Text = text
+    Btn.TextColor3 = isActive and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+    Btn.Font = Enum.Font.GothamBold
+    Btn.TextSize = 11
+    Btn.BorderSizePixel = 0
+    Btn.Parent = TabBar
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 6)
+    return Btn
+end
+
+local TabPage1Btn = createTabBtn("Thrust", 0, true)
+local TabPage2Btn = createTabBtn("Vanilla", 0.34, false)
+local TabPage3Btn = createTabBtn("Troll Mods", 0.68, false)
+
+local TopDivider = Instance.new("Frame")
+TopDivider.Size = UDim2.new(1, 0, 0, 1)
+TopDivider.Position = UDim2.new(0, 0, 0, 110)
+TopDivider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+TopDivider.BorderSizePixel = 0
+TopDivider.Parent = MainGroup
+
+-- [[ PAGES ]] --
+local Page1 = Instance.new("Frame")
+Page1.Size = UDim2.new(1, 0, 0, 420)
+Page1.Position = UDim2.new(0, 0, 0, 120)
+Page1.BackgroundTransparency = 1
+Page1.Visible = true
+Page1.Parent = MainGroup
+
+local Page2 = Instance.new("Frame")
+Page2.Size = UDim2.new(1, 0, 0, 420)
+Page2.Position = UDim2.new(0, 0, 0, 120)
+Page2.BackgroundTransparency = 1
+Page2.Visible = false
+Page2.Parent = MainGroup
+
+local Page3 = Instance.new("Frame")
+Page3.Size = UDim2.new(1, 0, 0, 420)
+Page3.Position = UDim2.new(0, 0, 0, 120)
+Page3.BackgroundTransparency = 1
+Page3.Visible = false
+Page3.Parent = MainGroup
+
+local allTabs = {
+    {Btn = TabPage1Btn, Page = Page1},
+    {Btn = TabPage2Btn, Page = Page2},
+    {Btn = TabPage3Btn, Page = Page3}
+}
+
+for _, tabData in ipairs(allTabs) do
+    tabData.Btn.MouseButton1Click:Connect(function()
+        playSound(ClickSound)
+        for _, otherTab in ipairs(allTabs) do
+            local isSelected = (otherTab == tabData)
+            otherTab.Page.Visible = isSelected
+            otherTab.Btn.BackgroundColor3 = isSelected and Color3.fromRGB(50, 50, 50) or Color3.fromRGB(35, 35, 35)
+            otherTab.Btn.TextColor3 = isSelected and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+        end
+    end)
+end
+
+local function createRow(parent, titleText, descText, rowHeight)
+    local Row = Instance.new("Frame")
+    Row.Size = UDim2.new(1, 0, 0, rowHeight)
+    Row.BackgroundTransparency = 1
+    Row.Parent = parent
+
+    local Title = Instance.new("TextLabel")
+    Title.Size = UDim2.new(1, 0, 0, 20)
+    Title.Position = UDim2.new(0, 0, 0, 10)
+    Title.BackgroundTransparency = 1
+    Title.Text = titleText
+    Title.TextColor3 = Color3.fromRGB(240, 240, 240)
+    Title.Font = Enum.Font.GothamBold
+    Title.TextSize = 14
+    Title.TextXAlignment = Enum.TextXAlignment.Left
+    Title.Parent = Row
+
+    local Desc = Instance.new("TextLabel")
+    Desc.Size = UDim2.new(1, 0, 0, 15)
+    Desc.Position = UDim2.new(0, 0, 0, 30)
+    Desc.BackgroundTransparency = 1
+    Desc.Text = descText
+    Desc.TextColor3 = Color3.fromRGB(180, 180, 180)
+    Desc.Font = Enum.Font.Gotham
+    Desc.TextSize = 12
+    Desc.TextXAlignment = Enum.TextXAlignment.Left
+    Desc.Parent = Row
+
+    local Divider = Instance.new("Frame")
+    Divider.Size = UDim2.new(1, 0, 0, 1)
+    Divider.Position = UDim2.new(0, 0, 1, -1)
+    Divider.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Divider.BorderSizePixel = 0
+    Divider.Parent = Row
+
+    return Row, Title, Desc
+end
+
+Instance.new("UIListLayout", Page1)
+Instance.new("UIListLayout", Page2)
+Instance.new("UIListLayout", Page3)
+
+-- ==========================================
+-- PAGE 1 CONTENT (Vector Thrust Engine)
+-- ==========================================
+local AccelRow = createRow(Page1, "Acceleration Mode", "Select how fast the engine gains speed", 90)
+local AccelBtnContainer = Instance.new("Frame")
+AccelBtnContainer.Size = UDim2.new(1, 0, 0, 26)
+AccelBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+AccelBtnContainer.BackgroundTransparency = 1
+AccelBtnContainer.Parent = AccelRow
+
+local function createAccelButton(name, xPos, width)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(width, -5, 1, 0)
+    Btn.Position = UDim2.new(xPos, 0, 0, 0)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Btn.Text = name
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamMedium
+    Btn.TextSize = 11
+    Btn.BorderSizePixel = 0
+    Btn.Parent = AccelBtnContainer
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    addHoverAnimation(Btn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+    return Btn
+end
+
+local BtnVerySlow = createAccelButton("Very Slow", 0, 0.25)
+local BtnSlow = createAccelButton("Slow", 0.25, 0.25)
+local BtnMed = createAccelButton("Medium", 0.50, 0.25)
+local BtnFast = createAccelButton("Fast", 0.75, 0.25)
+local allAccelBtns = {BtnVerySlow, BtnSlow, BtnMed, BtnFast}
+
+local function updateAccelSelection(selectedName, selectedBtn)
+    VehicleSettings.CurrentAccelName = selectedName
+    VehicleSettings.Acceleration = AccelModes[selectedName]
+    for _, btn in ipairs(allAccelBtns) do
+        local isSel = (btn == selectedBtn)
+        TweenService:Create(btn, TweenInfo.new(0.3), {
+            BackgroundColor3 = isSel and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40),
+            TextColor3 = isSel and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)
+        }):Play()
+    end
+end
+updateAccelSelection("Medium", BtnMed)
+
+BtnVerySlow.MouseButton1Click:Connect(function() updateAccelSelection("Very Slow", BtnVerySlow) end)
+BtnSlow.MouseButton1Click:Connect(function() updateAccelSelection("Slow", BtnSlow) end)
+BtnMed.MouseButton1Click:Connect(function() updateAccelSelection("Medium", BtnMed) end)
+BtnFast.MouseButton1Click:Connect(function() updateAccelSelection("Fast", BtnFast) end)
+
+local TSpeedRow, TSpeedTitle, TSpeedDesc = createRow(Page1, "Thrust Max Speed Limit", "Current Limit: 450", 90)
+local TSpeedBtnContainer = Instance.new("Frame")
+TSpeedBtnContainer.Size = UDim2.new(1, 0, 0, 26)
+TSpeedBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+TSpeedBtnContainer.BackgroundTransparency = 1
+TSpeedBtnContainer.Parent = TSpeedRow
+
+local function createTSpeedAdjustButton(text, xPos)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0.25, -5, 1, 0)
+    Btn.Position = UDim2.new(xPos, 0, 0, 0)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamMedium
+    Btn.TextSize = 12
+    Btn.BorderSizePixel = 0
+    Btn.Parent = TSpeedBtnContainer
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    addHoverAnimation(Btn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+    
+    Btn.MouseButton1Click:Connect(function()
+        local delta = tonumber(text) or 0
+        VehicleSettings.ThrustMaxSpeed = math.clamp(VehicleSettings.ThrustMaxSpeed + delta, 100, 1500)
+        TSpeedDesc.Text = "Current Limit: " .. tostring(VehicleSettings.ThrustMaxSpeed)
+    end)
+    return Btn
+end
+createTSpeedAdjustButton("-100", 0)
+createTSpeedAdjustButton("-25", 0.25)
+createTSpeedAdjustButton("+25", 0.50)
+createTSpeedAdjustButton("+100", 0.75)
+
+local MasterRow, MasterTitle, MasterDesc = createRow(Page1, "Engine Override (Vector Thrust)", "Overrides standard physics with custom thrust", 70)
+local MasterToggleBtn = Instance.new("TextButton")
+MasterToggleBtn.Size = UDim2.new(0, 100, 0, 26)
+MasterToggleBtn.Position = UDim2.new(1, -100, 0, 15)
+MasterToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+MasterToggleBtn.Text = "Disabled"
+MasterToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+MasterToggleBtn.Font = Enum.Font.GothamMedium
+MasterToggleBtn.TextSize = 12
+MasterToggleBtn.BorderSizePixel = 0
+MasterToggleBtn.Parent = MasterRow
+Instance.new("UICorner", MasterToggleBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(MasterToggleBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+
+MasterToggleBtn.MouseButton1Click:Connect(function()
+    VehicleSettings.ThrustEnabled = not VehicleSettings.ThrustEnabled
+    MasterToggleBtn.Text = VehicleSettings.ThrustEnabled and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.ThrustEnabled and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(MasterToggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.ThrustEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+-- ==========================================
+-- PAGE 2 CONTENT (Vanilla Mods & Custom Brake)
+-- ==========================================
+local VSpeedRow, VSpeedTitle, VSpeedDesc = createRow(Page2, "Vanilla Speed Uncapper", "Current Limit: 800", 90)
+local VSpeedBtnContainer = Instance.new("Frame")
+VSpeedBtnContainer.Size = UDim2.new(1, 0, 0, 26)
+VSpeedBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+VSpeedBtnContainer.BackgroundTransparency = 1
+VSpeedBtnContainer.Parent = VSpeedRow
+
+local function createVSpeedAdjustButton(text, xPos)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0.25, -5, 1, 0)
+    Btn.Position = UDim2.new(xPos, 0, 0, 0)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamMedium
+    Btn.TextSize = 12
+    Btn.BorderSizePixel = 0
+    Btn.Parent = VSpeedBtnContainer
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    addHoverAnimation(Btn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+    Btn.MouseButton1Click:Connect(function()
+        local delta = tonumber(text) or 0
+        VehicleSettings.VanillaMaxSpeed = math.clamp(VehicleSettings.VanillaMaxSpeed + delta, 100, 5000)
+        VSpeedDesc.Text = "Current Limit: " .. tostring(VehicleSettings.VanillaMaxSpeed)
+    end)
+    return Btn
+end
+createVSpeedAdjustButton("-100", 0)
+createVSpeedAdjustButton("-25", 0.25)
+createVSpeedAdjustButton("+25", 0.50)
+createVSpeedAdjustButton("+100", 0.75)
+
+local VToggleRow, VToggleTitle, VToggleDesc = createRow(Page2, "Enable Speed Uncapper", "Increases Top Speed ONLY. Torque remains untouched.", 70)
+local VToggleBtn = Instance.new("TextButton")
+VToggleBtn.Size = UDim2.new(0, 100, 0, 26)
+VToggleBtn.Position = UDim2.new(1, -100, 0, 15)
+VToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+VToggleBtn.Text = "Disabled"
+VToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+VToggleBtn.Font = Enum.Font.GothamMedium
+VToggleBtn.TextSize = 12
+VToggleBtn.BorderSizePixel = 0
+VToggleBtn.Parent = VToggleRow
+Instance.new("UICorner", VToggleBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(VToggleBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+
+VToggleBtn.MouseButton1Click:Connect(function()
+    VehicleSettings.VanillaUncapEnabled = not VehicleSettings.VanillaUncapEnabled
+    VToggleBtn.Text = VehicleSettings.VanillaUncapEnabled and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.VanillaUncapEnabled and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(VToggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.VanillaUncapEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+local BrakeToggleRow, BrakeToggleTitle, BrakeToggleDesc = createRow(Page2, "Custom Brake System", "Allows rapid stopping independent of Roblox physics", 70)
+local BrakeToggleBtn = Instance.new("TextButton")
+BrakeToggleBtn.Size = UDim2.new(0, 100, 0, 26)
+BrakeToggleBtn.Position = UDim2.new(1, -100, 0, 15)
+BrakeToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+BrakeToggleBtn.Text = "Disabled"
+BrakeToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+BrakeToggleBtn.Font = Enum.Font.GothamMedium
+BrakeToggleBtn.TextSize = 12
+BrakeToggleBtn.BorderSizePixel = 0
+BrakeToggleBtn.Parent = BrakeToggleRow
+Instance.new("UICorner", BrakeToggleBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(BrakeToggleBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+
+BrakeToggleBtn.MouseButton1Click:Connect(function()
+    VehicleSettings.BrakeEnabled = not VehicleSettings.BrakeEnabled
+    BrakeToggleBtn.Text = VehicleSettings.BrakeEnabled and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.BrakeEnabled and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(BrakeToggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.BrakeEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+local BPowerRow, BPowerTitle, BPowerDesc = createRow(Page2, "Brake Power", "Current Power: 100% (Instant)", 90)
+local BPowerBtnContainer = Instance.new("Frame")
+BPowerBtnContainer.Size = UDim2.new(1, 0, 0, 26)
+BPowerBtnContainer.Position = UDim2.new(0, 0, 0, 50)
+BPowerBtnContainer.BackgroundTransparency = 1
+BPowerBtnContainer.Parent = BPowerRow
+
+local function createBPowerAdjustButton(text, xPos, delta)
+    local Btn = Instance.new("TextButton")
+    Btn.Size = UDim2.new(0.25, -5, 1, 0)
+    Btn.Position = UDim2.new(xPos, 0, 0, 0)
+    Btn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+    Btn.Text = text
+    Btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+    Btn.Font = Enum.Font.GothamMedium
+    Btn.TextSize = 12
+    Btn.BorderSizePixel = 0
+    Btn.Parent = BPowerBtnContainer
+    Instance.new("UICorner", Btn).CornerRadius = UDim.new(0, 4)
+    addHoverAnimation(Btn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+    Btn.MouseButton1Click:Connect(function()
+        VehicleSettings.BrakePower = math.clamp(VehicleSettings.BrakePower + delta, 10, 100)
+        BPowerDesc.Text = "Current Power: " .. tostring(VehicleSettings.BrakePower) .. "%" .. (VehicleSettings.BrakePower == 100 and " (Instant)" or "")
+    end)
+    return Btn
+end
+createBPowerAdjustButton("-25%", 0, -25)
+createBPowerAdjustButton("-10%", 0.25, -10)
+createBPowerAdjustButton("+10%", 0.50, 10)
+createBPowerAdjustButton("+25%", 0.75, 25)
+
+local BKeyRow, BKeyTitle, BKeyDesc = createRow(Page2, "Brake Keybind", "Click to assign a new key", 70)
+local BKeyBtn = Instance.new("TextButton")
+BKeyBtn.Size = UDim2.new(0, 100, 0, 26)
+BKeyBtn.Position = UDim2.new(1, -100, 0, 15)
+BKeyBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+BKeyBtn.Text = "Key: " .. VehicleSettings.BrakeKey.Name
+BKeyBtn.TextColor3 = Color3.fromRGB(240, 240, 240)
+BKeyBtn.Font = Enum.Font.GothamMedium
+BKeyBtn.TextSize = 12
+BKeyBtn.BorderSizePixel = 0
+BKeyBtn.Parent = BKeyRow
+Instance.new("UICorner", BKeyBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(BKeyBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(60, 60, 60))
+
+local listeningForBrakeKey = false
+BKeyBtn.MouseButton1Click:Connect(function()
+    listeningForBrakeKey = true
+    BKeyBtn.Text = "Press any key..."
+    TweenService:Create(BKeyBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(80, 60, 20)}):Play()
+end)
+
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if listeningForBrakeKey and input.UserInputType == Enum.UserInputType.Keyboard then
+        listeningForBrakeKey = false
+        VehicleSettings.BrakeKey = input.KeyCode
+        BKeyBtn.Text = "Key: " .. input.KeyCode.Name
+        TweenService:Create(BKeyBtn, TweenInfo.new(0.3), {BackgroundColor3 = Color3.fromRGB(40, 40, 40)}):Play()
+    end
+end)
+
+-- ==========================================
+-- PAGE 3 CONTENT (Troll Mods)
+-- ==========================================
+local SpiderRow, SpiderTitle, SpiderDesc = createRow(Page3, "Spider Car (Wall Climb)", "Drives on walls! W/S to move while stuck. (Disables Anti-Flip)", 70)
+local SpiderToggleBtn = Instance.new("TextButton")
+SpiderToggleBtn.Size = UDim2.new(0, 100, 0, 26)
+SpiderToggleBtn.Position = UDim2.new(1, -100, 0, 15)
+SpiderToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+SpiderToggleBtn.Text = "Disabled"
+SpiderToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+SpiderToggleBtn.Font = Enum.Font.GothamMedium
+SpiderToggleBtn.TextSize = 12
+SpiderToggleBtn.BorderSizePixel = 0
+SpiderToggleBtn.Parent = SpiderRow
+Instance.new("UICorner", SpiderToggleBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(SpiderToggleBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(100, 40, 40))
+
+SpiderToggleBtn.MouseButton1Click:Connect(function()
+    VehicleSettings.SpiderCarEnabled = not VehicleSettings.SpiderCarEnabled
+    SpiderToggleBtn.Text = VehicleSettings.SpiderCarEnabled and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.SpiderCarEnabled and Color3.fromRGB(120, 50, 50) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(SpiderToggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.SpiderCarEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+local GhostRow, GhostTitle, GhostDesc = createRow(Page3, "Ghost Mode (No-Clip)", "Drive through OTHER cars and players! You won't fall through the ground.", 70)
+local GhostToggleBtn = Instance.new("TextButton")
+GhostToggleBtn.Size = UDim2.new(0, 100, 0, 26)
+GhostToggleBtn.Position = UDim2.new(1, -100, 0, 15)
+GhostToggleBtn.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+GhostToggleBtn.Text = "Disabled"
+GhostToggleBtn.TextColor3 = Color3.fromRGB(150, 150, 150)
+GhostToggleBtn.Font = Enum.Font.GothamMedium
+GhostToggleBtn.TextSize = 12
+GhostToggleBtn.BorderSizePixel = 0
+GhostToggleBtn.Parent = GhostRow
+Instance.new("UICorner", GhostToggleBtn).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(GhostToggleBtn, Color3.fromRGB(40, 40, 40), Color3.fromRGB(80, 40, 80))
+
+GhostToggleBtn.MouseButton1Click:Connect(function()
+    VehicleSettings.GhostModeEnabled = not VehicleSettings.GhostModeEnabled
+    GhostToggleBtn.Text = VehicleSettings.GhostModeEnabled and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.GhostModeEnabled and Color3.fromRGB(100, 50, 100) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(GhostToggleBtn, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.GhostModeEnabled and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+-- GLOBAL ANTI FLIP
+local AntiFlipRow, AntiFlipTitle, AntiFlipDesc = createRow(MainGroup, "Global Anti-Flip Safety", "Prevents vehicle from flipping over", 60)
+AntiFlipRow.Position = UDim2.new(0, 0, 1, -70)
+AntiFlipRow.Parent = MainGroup
+
+local AntiFlipToggle = Instance.new("TextButton")
+AntiFlipToggle.Size = UDim2.new(0, 100, 0, 26)
+AntiFlipToggle.Position = UDim2.new(1, -100, 0, 15)
+AntiFlipToggle.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+AntiFlipToggle.Text = "Enabled"
+AntiFlipToggle.TextColor3 = Color3.fromRGB(255, 255, 255)
+AntiFlipToggle.Font = Enum.Font.GothamMedium
+AntiFlipToggle.TextSize = 12
+AntiFlipToggle.BorderSizePixel = 0
+AntiFlipToggle.Parent = AntiFlipRow
+Instance.new("UICorner", AntiFlipToggle).CornerRadius = UDim.new(0, 4)
+addHoverAnimation(AntiFlipToggle, Color3.fromRGB(80, 80, 80), Color3.fromRGB(100, 100, 100))
+
+AntiFlipToggle.MouseButton1Click:Connect(function()
+    VehicleSettings.AntiFlip = not VehicleSettings.AntiFlip
+    AntiFlipToggle.Text = VehicleSettings.AntiFlip and "Enabled" or "Disabled"
+    local tColor = VehicleSettings.AntiFlip and Color3.fromRGB(80, 80, 80) or Color3.fromRGB(40, 40, 40)
+    TweenService:Create(AntiFlipToggle, TweenInfo.new(0.3), {BackgroundColor3 = tColor, TextColor3 = VehicleSettings.AntiFlip and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(150, 150, 150)}):Play()
+end)
+
+-- [[ TRANSITIONS ]] --
+AgreeBtn.MouseButton1Click:Connect(function()
+    playSound(ClickSound)
+    local fadeOut = TweenService:Create(WarningGroup, TweenInfo.new(0.5, Enum.EasingStyle.Sine), {GroupTransparency = 1, Position = UDim2.new(0.5, -200, 0.55, -100)})
+    local overlayFade = TweenService:Create(Overlay, TweenInfo.new(0.5), {BackgroundTransparency = 1})
+    
+    fadeOut:Play()
+    overlayFade:Play()
+    
+    fadeOut.Completed:Wait()
+    WarningGroup.Visible = false
+    Overlay.Visible = false
+    
+    MainGroup.Visible = true
+    TweenService:Create(MainGroup, TweenInfo.new(0.6, Enum.EasingStyle.Quart, Enum.EasingDirection.Out), {
+        GroupTransparency = 0,
+        Position = UDim2.new(0.5, -230, 0.5, -310)
+    }):Play()
+end)
+
+-- [[ PHYSICS ENGINE & LOOP ]] --
+local function getActiveSeatAndRoot()
+    local char = LocalPlayer.Character
+    if not char then return nil, nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum and hum.SeatPart then
+        local seat = hum.SeatPart
+        if seat:IsA("VehicleSeat") then
+            return seat, seat.AssemblyRootPart or seat
+        end
+    end
+    return nil, nil
+end
+
+-- STEPPED: Collisions (Ghost Mode)
+-- FIX: Instead of making OUR car uncollidable (which makes us fall through the floor), 
+-- we make ALL OTHER PLAYERS AND THEIR CARS uncollidable for us locally!
+RunService.Stepped:Connect(function()
+    if VehicleSettings.GhostModeEnabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                -- Make other players' bodies ghosts
+                for _, part in ipairs(player.Character:GetDescendants()) do
+                    if part:IsA("BasePart") then 
+                        part.CanCollide = false 
+                    end
+                end
+                -- Make other players' vehicles ghosts
+                local hum = player.Character:FindFirstChildOfClass("Humanoid")
+                if hum and hum.SeatPart and hum.SeatPart.Parent then
+                    local vehicle = hum.SeatPart:FindFirstAncestorOfClass("Model") or hum.SeatPart.Parent
+                    for _, part in ipairs(vehicle:GetDescendants()) do
+                        if part:IsA("BasePart") then 
+                            part.CanCollide = false 
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- HEARTBEAT: Forces and Velocity
+RunService.Heartbeat:Connect(function(deltaTime)
+    local seat, root = getActiveSeatAndRoot()
+    if not seat or not root then return end
+
+    -- CUSTOM BRAKE SYSTEM
+    if VehicleSettings.BrakeEnabled and UserInputService:IsKeyDown(VehicleSettings.BrakeKey) then
+        local currentVel = root.AssemblyLinearVelocity
+        if VehicleSettings.BrakePower == 100 then
+            root.AssemblyLinearVelocity = Vector3.new(0, currentVel.Y, 0)
+        else
+            local reduction = VehicleSettings.BrakePower / 100
+            local drop = math.clamp(reduction * 0.15, 0.01, 1) 
+            root.AssemblyLinearVelocity = Vector3.new(currentVel.X * (1 - drop), currentVel.Y, currentVel.Z * (1 - drop))
+        end
+    end
+
+    -- PAGE 1 LOGIC: Vector Thrust
+    if VehicleSettings.ThrustEnabled then
+        seat.MaxSpeed = math.huge
+        seat.Torque = math.huge
+        
+        local currentVel = root.AssemblyLinearVelocity
+        local currentSpeed = currentVel.Magnitude
+
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+            if currentSpeed < VehicleSettings.ThrustMaxSpeed then
+                local pushDir = (currentSpeed > 5) and currentVel.Unit or root.CFrame.LookVector
+                root.AssemblyLinearVelocity = currentVel + (pushDir * VehicleSettings.Acceleration)
+            end
+        elseif UserInputService:IsKeyDown(Enum.KeyCode.S) then
+            if currentSpeed > 5 then
+                root.AssemblyLinearVelocity = currentVel - (currentVel.Unit * (VehicleSettings.Acceleration * 0.8))
+            end
+        end
+
+    -- PAGE 2 LOGIC: Vanilla Uncapper
+    elseif VehicleSettings.VanillaUncapEnabled then
+        if seat.MaxSpeed < VehicleSettings.VanillaMaxSpeed then
+            seat.MaxSpeed = VehicleSettings.VanillaMaxSpeed
+        end
+        
+        local currentVel = root.AssemblyLinearVelocity
+        local currentSpeed = currentVel.Magnitude
+        
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) and currentSpeed > 15 then
+            if currentSpeed < VehicleSettings.VanillaMaxSpeed then
+                local pushDir = (currentSpeed > 5) and currentVel.Unit or root.CFrame.LookVector
+                root.AssemblyLinearVelocity = currentVel + (pushDir * 0.25)
+            end
+        end
+    end
+
+    -- PAGE 3 LOGIC: SPIDER CAR (Fixed Wall Climb)
+    if VehicleSettings.SpiderCarEnabled then
+        local rayOrigin = root.Position
+        local rayDirection = -root.CFrame.UpVector * 15
+        local rayParams = RaycastParams.new()
+        rayParams.FilterDescendantsInstances = {LocalPlayer.Character, seat.Parent}
+        rayParams.FilterType = Enum.RaycastFilterType.Exclude
+
+        local result = workspace:Raycast(rayOrigin, rayDirection, rayParams)
+        
+        if result then
+            local antiGravity = root:FindFirstChild("WeloxAntiGravity")
+            if not antiGravity then
+                antiGravity = Instance.new("BodyForce")
+                antiGravity.Name = "WeloxAntiGravity"
+                antiGravity.Parent = root
+            end
+            antiGravity.Force = Vector3.new(0, root.AssemblyMass * workspace.Gravity, 0)
+
+            local bg = root:FindFirstChild("WeloxSpiderGyro")
+            if not bg then
+                bg = Instance.new("BodyGyro")
+                bg.Name = "WeloxSpiderGyro"
+                bg.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+                bg.P = 10000 
+                bg.Parent = root
+            end
+            
+            local normal = result.Normal
+            local forward = root.CFrame.LookVector
+            local right = forward:Cross(normal)
+            local newForward = normal:Cross(right)
+            
+            if newForward.Magnitude > 0.01 then
+                bg.CFrame = CFrame.lookAt(root.Position, root.Position + newForward, normal)
+            end
+
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then
+                root.AssemblyLinearVelocity = root.AssemblyLinearVelocity + (newForward * 4)
+            elseif UserInputService:IsKeyDown(Enum.KeyCode.S) then
+                root.AssemblyLinearVelocity = root.AssemblyLinearVelocity - (newForward * 4)
+            end
+        else
+            local antiGravity = root:FindFirstChild("WeloxAntiGravity")
+            if antiGravity then antiGravity:Destroy() end
+            local bg = root:FindFirstChild("WeloxSpiderGyro")
+            if bg then bg:Destroy() end
+        end
+    else
+        local antiGravity = root:FindFirstChild("WeloxAntiGravity")
+        if antiGravity then antiGravity:Destroy() end
+        local bg = root:FindFirstChild("WeloxSpiderGyro")
+        if bg then bg:Destroy() end
+    end
+
+    -- ANTI FLIP LOGIC
+    if VehicleSettings.AntiFlip and not VehicleSettings.SpiderCarEnabled then
+        local rotX, rotY, rotZ = root.CFrame:ToOrientation()
+        if math.abs(rotX) > 1.1 or math.abs(rotZ) > 1.1 then
+            root.CFrame = CFrame.new(root.Position) * CFrame.Angles(0, rotY, 0) + Vector3.new(0, 2, 0)
+            root.AssemblyAngularVelocity = Vector3.zero
+        end
+    end
+end)
